@@ -598,10 +598,13 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ── API base URL ───────────────────────────────────────────────────────────────
-// The HTML can be opened from any server (Live Server, PHP server, file://) but
-// the Flask backend always runs on port 5000. All fetch calls use this prefix.
-const API_BASE = 'http://localhost:5000';
+// API_BASE auto-detects the environment:
+// - On Render (or any live server): uses the same host serving the page
+// - Local dev with Flask:           uses localhost:5000
+// - Local dev with a different server (Live Server, PHP): uses localhost:5000
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000'
+  : window.location.origin;
 
 // ── Emotion color classes ──────────────────────────────────────────────────────
 function barClass(label) {

@@ -1,38 +1,35 @@
 # app.py
-# Flask application — thin routing layer only.
-# Business logic lives in: models.py, analysis.py, session.py
-
 import base64
 import os
+import sys
+
+# Ensure the project root is always on the path so analysis/models/session
+# import correctly regardless of where gunicorn is invoked from.
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 import cv2
 import numpy as np
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
 import analysis
 import models
 import session as sess
 
-# ── App setup ─────────────────────────────────────────────────────────────────
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-TMPL_DIR = os.path.join(ROOT_DIR, "templates")
+app = Flask(__name__, static_folder=ROOT_DIR, static_url_path="")
 
-app = Flask(__name__, template_folder=TMPL_DIR)
-
-# Allow the frontend to call /api/* from ANY origin.
-# This is needed when the HTML is served by VS Code Live Server, PHP server,
-# or opened as a plain file — rather than by Flask itself.
+# Allow API calls from any origin (Live Server, PHP server, file://, etc.)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Load ML models at startup (silent no-op if torch is not installed)
 models.load_models()
 
 
-# ── Helper: decode a base64 JPEG/PNG frame sent from the browser ──────────────
+# ── Helper ─────────────────────────────────────────────────────────────────────
 def _decode_frame(b64_string):
-    """Decode a data-URL or raw base64 string into a BGR numpy array."""
-    raw   = b64_string.split(",")[-1]   # strip "data:image/jpeg;base64," prefix
+    raw   = b64_string.split(",")[-1]
     data  = base64.b64decode(raw)
     arr   = np.frombuffer(data, np.uint8)
     frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -41,11 +38,13 @@ def _decode_frame(b64_string):
     return frame
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # Serve index.html from the project root (works whether it's at root or
+    # inside templates/ — Flask static_folder handles both)
+    return send_file(os.path.join(ROOT_DIR, "index.html"))
 
 
 @app.route("/api/status")
@@ -108,7 +107,6 @@ def api_analyze():
 def api_end():
     if not sess.is_active():
         return jsonify({"error": "No active session"}), 400
-
     result = sess.end()
     return jsonify(result)
 
@@ -118,7 +116,6 @@ def api_download():
     csv_path = sess.latest_csv_path()
     if not csv_path:
         return jsonify({"error": "No log file available yet — run a session first"}), 404
-
     abs_path = os.path.abspath(csv_path)
     return send_file(
         abs_path,
@@ -128,7 +125,7 @@ def api_download():
     )
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     os.makedirs(sess.LOGS_DIR, exist_ok=True)
     port  = int(os.environ.get("PORT", 5000))
