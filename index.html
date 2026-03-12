@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TruthLens · Emotional Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg-void:       #070a0f;
+    --bg-panel:      #0c1018;
+    --bg-card:       #101620;
+    --bg-surface:    #151d28;
+    --border:        rgba(0, 200, 120, 0.12);
+    --border-bright: rgba(0, 200, 120, 0.35);
+    --accent:        #00e87a;
+    --accent-dim:    rgba(0, 232, 122, 0.15);
+    --accent-glow:   rgba(0, 232, 122, 0.4);
+    --red:           #ff3d5a;
+    --red-dim:       rgba(255, 61, 90, 0.15);
+    --amber:         #ffb347;
+    --amber-dim:     rgba(255, 179, 71, 0.15);
+    --blue:          #38b6ff;
+    --blue-dim:      rgba(56, 182, 255, 0.15);
+    --purple:        #c084fc;
+    --purple-dim:    rgba(192, 132, 252, 0.15);
+    --text-primary:  #e2eaf6;
+    --text-muted:    #5a7080;
+    --text-dim:      #8a9db0;
+    --mono:          'JetBrains Mono', monospace;
+    --display:       'Rajdhani', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body, #root {
+    height: 100%;
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: var(--display);
+    overflow: hidden;
+  }
+
+  /* Subtle grid texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,232,122,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,232,122,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #root { position: relative; z-index: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  /* ── Layout ── */
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(7, 10, 15, 0.9);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-mark {
+    width: 30px;
+    height: 30px;
+    position: relative;
+  }
+  .logo-mark svg { width: 30px; height: 30px; }
+  .logo-text {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    background: linear-gradient(135deg, #00e87a 0%, #00bfff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .logo-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+  }
+  .status-badge.idle {
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+  }
+  .status-badge.live {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .status-badge.live .status-dot {
+    animation: pulse-dot 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.6); }
+  }
+
+  /* ── Main content ── */
+  .content {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* ── Left Column ── */
+  .left-col {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  .camera-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .camera-wrapper.active {
+    border-color: var(--border-bright);
+    box-shadow: 0 0 0 1px var(--accent-glow) inset,
+                0 0 30px -10px var(--accent-glow);
+  }
+
+  /* Corner decorations */
+  .camera-wrapper::before, .camera-wrapper::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    z-index: 3;
+  }
+  .camera-wrapper::before {
+    top: 0; left: 0;
+    border-top: 2px solid var(--accent);
+    border-left: 2px solid var(--accent);
+  }
+  .camera-wrapper::after {
+    bottom: 0; right: 0;
+    border-bottom: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+  }
+
+  .camera-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1); /* mirror */
+  }
+  canvas { display: none; }
+
+  .camera-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Scan line effect */
+  .camera-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.06) 2px,
+      rgba(0, 0, 0, 0.06) 4px
+    );
+  }
+
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    z-index: 3;
+  }
+  .camera-wrapper.active .scan-line {
+    opacity: 0.6;
+    animation: scan 3s linear infinite;
+  }
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+
+  /* Live metrics overlay */
+  .live-metrics {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .camera-wrapper.active .live-metrics {
+    opacity: 1;
+  }
+  .metric-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 8px;
+    background: rgba(7, 10, 15, 0.85);
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+    backdrop-filter: blur(8px);
+    white-space: nowrap;
+  }
+  .metric-chip span { color: var(--accent); font-weight: 700; }
+
+  .camera-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+  .camera-placeholder svg {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn:hover:not(:disabled)::after { opacity: 0.06; }
+  .btn:active:not(:disabled)::after { opacity: 0.12; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-start {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .btn-start:hover:not(:disabled) {
+    background: rgba(0, 232, 122, 0.22);
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+
+  .btn-end {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-dim);
+  }
+  .btn-end:hover:not(:disabled) {
+    background: rgba(255, 61, 90, 0.22);
+    box-shadow: 0 0 16px rgba(255, 61, 90, 0.4);
+  }
+
+  .btn-download {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: var(--blue-dim);
+    flex: 0 0 auto;
+    padding: 12px 14px;
+  }
+  .btn-download:hover:not(:disabled) {
+    background: rgba(56, 182, 255, 0.22);
+    box-shadow: 0 0 16px rgba(56, 182, 255, 0.4);
+  }
+
+  /* ── Right Column ── */
+  .right-col {
+    border-left: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    font-family: var(--mono);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Final State Card ── */
+  .final-state-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s ease;
+  }
+  .final-state-card.has-data {
+    border-color: var(--border-bright);
+  }
+  .final-state-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .final-state-card.has-data::before {
+    opacity: 1;
+  }
+
+  .state-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .state-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    transition: all 0.4s ease;
+    min-height: 36px;
+  }
+  .state-value.empty { color: var(--text-muted); font-size: 16px; }
+  .state-value.stress-high { color: var(--red); }
+  .state-value.stress-mild { color: var(--amber); }
+  .state-value.positive { color: var(--accent); }
+  .state-value.neutral { color: var(--blue); }
+
+  .state-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .state-meta-item strong {
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* ── Chart Panel ── */
+  .chart-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+  }
+
+  .emotion-list { display: flex; flex-direction: column; gap: 7px; }
+
+  .emotion-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 42px;
+    align-items: center;
+    gap: 8px;
+  }
+  .emotion-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: capitalize;
+    letter-spacing: 0.05em;
+  }
+  .emotion-bar-track {
+    height: 6px;
+    background: var(--bg-surface);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .emotion-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  .emotion-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 4px;
+    height: 100%;
+    background: rgba(255,255,255,0.4);
+    border-radius: 0 3px 3px 0;
+  }
+  .emotion-pct {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+    font-weight: 500;
+  }
+  .emotion-pct.top { color: var(--text-primary); font-weight: 700; }
+
+  .empty-chart {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 16px 0;
+    letter-spacing: 0.1em;
+  }
+
+  /* Emotion color map */
+  .bar-happy   { background: linear-gradient(90deg, #00e87a, #00c866); }
+  .bar-neutral { background: linear-gradient(90deg, #38b6ff, #1a9de8); }
+  .bar-sad     { background: linear-gradient(90deg, #7dd3fc, #4ba8e0); }
+  .bar-angry   { background: linear-gradient(90deg, #ff3d5a, #e0223f); }
+  .bar-fear    { background: linear-gradient(90deg, #c084fc, #a060e0); }
+  .bar-disgust { background: linear-gradient(90deg, #fb923c, #e07020); }
+  .bar-surprise { background: linear-gradient(90deg, #fde047, #e0b020); }
+  .bar-no_face { background: linear-gradient(90deg, #5a7080, #3a5060); }
+  .bar-no_audio { background: linear-gradient(90deg, #5a7080, #3a5060); }
+  .bar-unknown { background: linear-gradient(90deg, #5a7080, #3a5060); }
+  .bar-center  { background: linear-gradient(90deg, #00e87a, #00c866); }
+  .bar-left    { background: linear-gradient(90deg, #38b6ff, #1a9de8); }
+  .bar-right   { background: linear-gradient(90deg, #ffb347, #e09020); }
+  .bar-audio_err { background: linear-gradient(90deg, #5a7080, #3a5060); }
+  .bar-default { background: linear-gradient(90deg, #5a7080, #3a5060); }
+
+  /* ── Notification Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+    z-index: 999;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Frame counter ── */
+  .frame-counter {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .frame-counter .fc-num {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .content {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+    }
+    .right-col {
+      border-left: none;
+      border-top: 1px solid var(--border);
+      max-height: 50vh;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── API base URL ───────────────────────────────────────────────────────────────
+// The HTML can be opened from any server (Live Server, PHP server, file://) but
+// the Flask backend always runs on port 5000. All fetch calls use this prefix.
+const API_BASE = 'http://localhost:5000';
+
+// ── Emotion color classes ──────────────────────────────────────────────────────
+function barClass(label) {
+  const key = (label || 'default').toLowerCase().replace(/\s+/g, '_');
+  return `bar-${key}` in document.styleSheets[0]?.cssRules ? `bar-${key}` : 'bar-default';
+}
+function getBarCls(label) {
+  const known = ['happy','neutral','sad','angry','fear','disgust','surprise',
+                 'no_face','no_audio','unknown','center','left','right',
+                 'audio_err','default'];
+  const k = (label||'default').toLowerCase();
+  return known.includes(k) ? `bar-${k}` : 'bar-default';
+}
+
+// ── Final state colour mapping ─────────────────────────────────────────────────
+function stateClass(s) {
+  if (!s || s === '—') return 'empty';
+  const lc = s.toLowerCase();
+  if (lc.includes('high stress')) return 'stress-high';
+  if (lc.includes('mild stress')) return 'stress-mild';
+  if (lc.includes('positive') || lc.includes('calm') || lc.includes('relax')) return 'positive';
+  return 'neutral';
+}
+
+// ── Percentage bar list ────────────────────────────────────────────────────────
+function PercentChart({ data }) {
+  if (!data || Object.keys(data).length === 0) {
+    return <div className="empty-chart">No data yet</div>;
+  }
+  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const max = sorted[0]?.[1] || 1;
+  return (
+    <div className="emotion-list">
+      {sorted.map(([label, pct], i) => (
+        <div className="emotion-row" key={label}>
+          <span className="emotion-name">{label}</span>
+          <div className="emotion-bar-track">
+            <div
+              className={`emotion-bar-fill ${getBarCls(label)}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className={`emotion-pct ${i === 0 ? 'top' : ''}`}>{pct}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const IconCamera = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </svg>
+);
+const IconPlay = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <polygon points="5,3 19,12 5,21"/>
+  </svg>
+);
+const IconStop = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+  </svg>
+);
+const IconDownload = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+);
+const LogoMark = () => (
+  <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+    <circle cx="15" cy="15" r="11" stroke="url(#lg)" strokeWidth="1.5"/>
+    <circle cx="15" cy="15" r="5" fill="url(#lg2)" opacity="0.8"/>
+    <line x1="15" y1="1" x2="15" y2="7" stroke="url(#lg)" strokeWidth="1.5"/>
+    <line x1="15" y1="23" x2="15" y2="29" stroke="url(#lg)" strokeWidth="1.5"/>
+    <defs>
+      <linearGradient id="lg" x1="0" y1="0" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#00e87a"/>
+        <stop offset="1" stopColor="#38b6ff"/>
+      </linearGradient>
+      <linearGradient id="lg2" x1="0" y1="0" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#00e87a" stopOpacity="0.5"/>
+        <stop offset="1" stopColor="#38b6ff" stopOpacity="0.5"/>
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function TruthLens() {
+  const [sessionActive, setSessionActive] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
+  const [liveData, setLiveData] = useState(null);
+  const [results, setResults] = useState(null);
+  const [toast, setToast] = useState({ msg: '', show: false });
+  const [cameraReady, setCameraReady] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [csvFile, setCsvFile] = useState(null);
+
+  const videoRef       = useRef(null);
+  const canvasRef      = useRef(null);
+  const streamRef      = useRef(null);
+  const intervalRef    = useRef(null);
+  const timerRef       = useRef(null);
+  const startedAtRef   = useRef(null);
+  // Ref mirror of sessionActive — the setInterval callback reads this so it
+  // always sees the latest value and is never caught by a stale closure.
+  const sessionLiveRef = useRef(false);
+
+  // Keep ref in sync with state
+  useEffect(() => { sessionLiveRef.current = sessionActive; }, [sessionActive]);
+
+  // ── Toast helper ──────────────────────────────────────────────────────────
+  const showToast = useCallback((msg) => {
+    setToast({ msg, show: true });
+    setTimeout(() => setToast(t => ({ ...t, show: false })), 3000);
+  }, []);
+
+  // ── Camera init ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720, facingMode: 'user' },
+          audio: false,
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play();
+            setCameraReady(true);
+          };
+        }
+      } catch (e) {
+        showToast('Camera access denied — check browser permissions');
+      }
+    }
+    initCamera();
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  // ── Capture & send frame ──────────────────────────────────────────────────
+  // Uses sessionLiveRef (not sessionActive state) to avoid stale-closure bug.
+  const captureAndAnalyze = useCallback(async () => {
+    if (!sessionLiveRef.current) return;
+    if (!canvasRef.current || !videoRef.current) return;
+
+    const canvas = canvasRef.current;
+    const video  = videoRef.current;
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frame: dataUrl }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setLiveData(data);
+        setFrameCount(data.frames_total || 0);
+      }
+    } catch (_) { /* drop failed frames silently */ }
+  }, []); // no deps — reads live state via ref
+
+  // ── Start session ─────────────────────────────────────────────────────────
+  const startSession = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Failed to start session');
+
+      // Update ref first so the very first interval tick can run
+      sessionLiveRef.current = true;
+      setSessionActive(true);
+      setResults(null);
+      setFrameCount(0);
+      setLiveData(null);
+      setElapsedTime(0);
+      startedAtRef.current = Date.now();
+
+      clearInterval(intervalRef.current);
+      clearInterval(timerRef.current);
+      intervalRef.current = setInterval(captureAndAnalyze, 800);
+      timerRef.current    = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startedAtRef.current) / 1000));
+      }, 1000);
+
+      showToast('Session started — analysis running');
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+    }
+    setLoading(false);
+  }, [captureAndAnalyze, showToast]);
+
+  // ── End session ───────────────────────────────────────────────────────────
+  const endSession = useCallback(async () => {
+    // Stop intervals before the API call so no stray analyze requests land
+    clearInterval(intervalRef.current);
+    clearInterval(timerRef.current);
+    sessionLiveRef.current = false;
+    setSessionActive(false);
+    setLoading(true);
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Failed to end session');
+      setResults(data);
+      if (data.csv_file) setCsvFile(data.csv_file);
+      showToast('Session complete — results ready');
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+    }
+    setLoading(false);
+  }, [showToast]);
+
+  // ── Download CSV ──────────────────────────────────────────────────────────
+  const downloadLogs = useCallback(async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/api/download`);
+      // Check Content-Type — a non-CSV response means no file is ready yet
+      const ct = resp.headers.get('Content-Type') || '';
+      if (!resp.ok || !ct.includes('csv')) {
+        showToast('No log file available yet — run a session first');
+        return;
+      }
+      const blob     = await resp.blob();
+      const url      = URL.createObjectURL(blob);
+      const filename = csvFile || 'truthlens_session.csv';
+      const a        = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded: ${filename}`);
+    } catch (e) {
+      showToast('Download failed — is the server running?');
+    }
+  }, [csvFile, showToast]);
+
+  // ── Format time ───────────────────────────────────────────────────────────
+  const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  return (
+    <div className="app">
+      {/* Header */}
+      <header className="header">
+        <div className="logo">
+          <div className="logo-mark"><LogoMark /></div>
+          <div>
+            <div className="logo-text">TRUTHLENS</div>
+            <div className="logo-sub">Real-Time Emotional Analysis</div>
+          </div>
+        </div>
+        <div className="header-meta">
+          {sessionActive && (
+            <div className="frame-counter">
+              <span className="fc-num">{frameCount}</span> frames
+              &nbsp;·&nbsp;
+              <span className="fc-num">{formatTime(elapsedTime)}</span>
+            </div>
+          )}
+          <div className={`status-badge ${sessionActive ? 'live' : 'idle'}`}>
+            <div className="status-dot" />
+            {sessionActive ? 'LIVE' : 'STANDBY'}
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="content">
+        {/* ── Left Column ── */}
+        <div className="left-col">
+          <div className={`camera-wrapper ${sessionActive ? 'active' : ''}`}>
+            <div className="camera-inner">
+              <video ref={videoRef} playsInline muted />
+              <canvas ref={canvasRef} />
+              {!cameraReady && (
+                <div className="camera-placeholder">
+                  <IconCamera />
+                  <span>Waiting for camera access…</span>
+                </div>
+              )}
+              <div className="camera-overlay">
+                <div className="scan-line" />
+              </div>
+              {/* Live metric chips */}
+              {liveData && (
+                <div className="live-metrics">
+                  <div className="metric-chip">
+                    FACE: <span>{liveData.face_emo}</span>
+                    &nbsp;{(liveData.face_conf * 100).toFixed(0)}%
+                  </div>
+                  <div className="metric-chip">
+                    GAZE: <span>{liveData.gaze}</span>
+                  </div>
+                  <div className="metric-chip">
+                    VOICE: <span>{liveData.voice_emo}</span>
+                    &nbsp;{(liveData.voice_conf * 100).toFixed(0)}%
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="controls">
+            <button
+              className="btn btn-start"
+              onClick={startSession}
+              disabled={sessionActive || loading || !cameraReady}
+            >
+              <IconPlay /> Start Session
+            </button>
+            <button
+              className="btn btn-end"
+              onClick={endSession}
+              disabled={!sessionActive || loading}
+            >
+              <IconStop /> End Session
+            </button>
+            <button
+              className="btn btn-download"
+              onClick={downloadLogs}
+              disabled={loading}
+              title="Download CSV log"
+            >
+              <IconDownload />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Right Column ── */}
+        <div className="right-col">
+          {/* Final State */}
+          <div className={`final-state-card ${results ? 'has-data' : ''}`}>
+            <div className="panel-title">Final Assessment</div>
+            <div className="state-label">Session State</div>
+            <div className={`state-value ${stateClass(results?.final_state)}`}>
+              {results?.final_state || '—'}
+            </div>
+            {results && (
+              <div className="state-meta">
+                <div className="state-meta-item">
+                  Frames: <strong>{results.total_frames}</strong>
+                </div>
+                <div className="state-meta-item">
+                  Duration: <strong>{results.duration_sec}s</strong>
+                </div>
+                {results.csv_file && (
+                  <div className="state-meta-item">
+                    Log: <strong>{results.csv_file}</strong>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Face Emotions */}
+          <div className="chart-panel">
+            <div className="panel-title">Face Emotion %</div>
+            <PercentChart data={results?.face_percent} />
+          </div>
+
+          {/* Gaze Directions */}
+          <div className="chart-panel">
+            <div className="panel-title">Gaze Direction %</div>
+            <PercentChart data={results?.gaze_percent} />
+          </div>
+
+          {/* Voice Emotions */}
+          <div className="chart-panel">
+            <div className="panel-title">Voice Emotion %</div>
+            <PercentChart data={results?.voice_percent} />
+          </div>
+        </div>
+      </div>
+
+      {/* Toast */}
+      <div className={`toast ${toast.show ? 'show' : ''}`}>{toast.msg}</div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<TruthLens />);
+</script>
+</body>
+</html>
