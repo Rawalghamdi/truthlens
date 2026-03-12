@@ -2,6 +2,7 @@ flask>=2.3.0
 flask-cors>=4.0.0
 opencv-python>=4.8.0
 numpy>=1.24.0
+gunicorn>=21.2.0
 
 # Uncomment below when you add your trained .pt model files
 # torch>=2.0.0
