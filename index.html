@@ -38,11 +38,14 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body, #root {
-    height: 100%;
+    min-height: 100%;
     background: var(--bg-void);
     color: var(--text-primary);
     font-family: var(--display);
-    overflow: hidden;
+  }
+
+  body {
+    overflow-y: auto;
   }
 
   /* Subtle grid texture */
@@ -69,7 +72,7 @@
   .app {
     display: grid;
     grid-template-rows: 56px 1fr;
-    height: 100vh;
+    min-height: 100vh;
   }
 
   /* ── Header ── */
@@ -160,7 +163,6 @@
     display: grid;
     grid-template-columns: 1fr 380px;
     gap: 0;
-    overflow: hidden;
   }
 
   /* ── Left Column ── */
@@ -169,11 +171,11 @@
     flex-direction: column;
     padding: 20px;
     gap: 16px;
-    overflow: hidden;
   }
 
   .camera-wrapper {
     flex: 1;
+    min-height: 280px;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -376,16 +378,6 @@
   }
 
   /* ── Right Column ── */
-  .right-col {
-    border-left: 1px solid var(--border);
-    background: var(--bg-panel);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    gap: 12px;
-  }
 
   .panel-title {
     font-size: 10px;
@@ -545,6 +537,43 @@
   .bar-audio_err { background: linear-gradient(90deg, #5a7080, #3a5060); }
   .bar-default { background: linear-gradient(90deg, #5a7080, #3a5060); }
 
+  /* ── Analysis loading state ── */
+  .analysing-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 40px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+  }
+  .analysing-spinner {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .analysing-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .analysing-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+  }
+
   /* ── Notification Toast ── */
   .toast {
     position: fixed;
@@ -579,16 +608,60 @@
     font-weight: 700;
   }
 
+  /* ── Right Column ── */
+  .right-col {
+    border-left: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    gap: 12px;
+  }
+
   /* ── Responsive ── */
   @media (max-width: 900px) {
     .content {
       grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto;
     }
     .right-col {
       border-left: none;
       border-top: 1px solid var(--border);
-      max-height: 50vh;
+      overflow-y: visible;
+    }
+    .header-meta .frame-counter {
+      display: none;
+    }
+    .logo-sub {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .header {
+      padding: 0 14px;
+    }
+    .logo-text {
+      font-size: 18px;
+    }
+    .left-col {
+      padding: 12px;
+      gap: 12px;
+    }
+    .right-col {
+      padding: 12px;
+    }
+    .controls {
+      gap: 8px;
+    }
+    .btn {
+      font-size: 11px;
+      padding: 10px 10px;
+    }
+    .state-value {
+      font-size: 22px;
     }
   }
 </style>
@@ -701,6 +774,7 @@ const LogoMark = () => (
 function TruthLens() {
   const [sessionActive, setSessionActive] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [analysing, setAnalysing] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
   const [liveData, setLiveData] = useState(null);
   const [results, setResults] = useState(null);
@@ -810,9 +884,10 @@ function TruthLens() {
 
       showToast('Session started — analysis running');
     } catch (e) {
-      showToast(`Error: ${e.message}`);
+      showToast(`Start failed: ${e.message}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [captureAndAnalyze, showToast]);
 
   // ── End session ───────────────────────────────────────────────────────────
@@ -823,6 +898,7 @@ function TruthLens() {
     sessionLiveRef.current = false;
     setSessionActive(false);
     setLoading(true);
+    setAnalysing(true);
 
     try {
       const resp = await fetch(`${API_BASE}/api/end`, {
@@ -830,14 +906,16 @@ function TruthLens() {
         headers: { 'Content-Type': 'application/json' },
       });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Failed to end session');
+      if (!resp.ok) throw new Error(data.error || `Server responded ${resp.status}`);
       setResults(data);
       if (data.csv_file) setCsvFile(data.csv_file);
       showToast('Session complete — results ready');
     } catch (e) {
-      showToast(`Error: ${e.message}`);
+      showToast(`End session failed: ${e.message}`);
+    } finally {
+      setAnalysing(false);
+      setLoading(false);
     }
-    setLoading(false);
   }, [showToast]);
 
   // ── Download CSV ──────────────────────────────────────────────────────────
@@ -958,47 +1036,57 @@ function TruthLens() {
 
         {/* ── Right Column ── */}
         <div className="right-col">
-          {/* Final State */}
-          <div className={`final-state-card ${results ? 'has-data' : ''}`}>
-            <div className="panel-title">Final Assessment</div>
-            <div className="state-label">Session State</div>
-            <div className={`state-value ${stateClass(results?.final_state)}`}>
-              {results?.final_state || '—'}
+          {analysing ? (
+            <div className="analysing-overlay">
+              <div className="analysing-spinner" />
+              <div className="analysing-text">Analysing Session</div>
+              <div className="analysing-sub">Processing your results…</div>
             </div>
-            {results && (
-              <div className="state-meta">
-                <div className="state-meta-item">
-                  Frames: <strong>{results.total_frames}</strong>
+          ) : (
+            <>
+              {/* Final State */}
+              <div className={`final-state-card ${results ? 'has-data' : ''}`}>
+                <div className="panel-title">Final Assessment</div>
+                <div className="state-label">Session State</div>
+                <div className={`state-value ${stateClass(results?.final_state)}`}>
+                  {results?.final_state || '—'}
                 </div>
-                <div className="state-meta-item">
-                  Duration: <strong>{results.duration_sec}s</strong>
-                </div>
-                {results.csv_file && (
-                  <div className="state-meta-item">
-                    Log: <strong>{results.csv_file}</strong>
+                {results && (
+                  <div className="state-meta">
+                    <div className="state-meta-item">
+                      Frames: <strong>{results.total_frames}</strong>
+                    </div>
+                    <div className="state-meta-item">
+                      Duration: <strong>{results.duration_sec}s</strong>
+                    </div>
+                    {results.csv_file && (
+                      <div className="state-meta-item">
+                        Log: <strong>{results.csv_file}</strong>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Face Emotions */}
-          <div className="chart-panel">
-            <div className="panel-title">Face Emotion %</div>
-            <PercentChart data={results?.face_percent} />
-          </div>
+              {/* Face Emotions */}
+              <div className="chart-panel">
+                <div className="panel-title">Face Emotion %</div>
+                <PercentChart data={results?.face_percent} />
+              </div>
 
-          {/* Gaze Directions */}
-          <div className="chart-panel">
-            <div className="panel-title">Gaze Direction %</div>
-            <PercentChart data={results?.gaze_percent} />
-          </div>
+              {/* Gaze Directions */}
+              <div className="chart-panel">
+                <div className="panel-title">Gaze Direction %</div>
+                <PercentChart data={results?.gaze_percent} />
+              </div>
 
-          {/* Voice Emotions */}
-          <div className="chart-panel">
-            <div className="panel-title">Voice Emotion %</div>
-            <PercentChart data={results?.voice_percent} />
-          </div>
+              {/* Voice Emotions */}
+              <div className="chart-panel">
+                <div className="panel-title">Voice Emotion %</div>
+                <PercentChart data={results?.voice_percent} />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
