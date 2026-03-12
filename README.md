@@ -49,6 +49,10 @@ truthlens/
 └── requirements.txt    # Python dependencies
 ```
 
+## Live Demo
+
+https://truthlens-cjpu.onrender.com
+
 ## Notes
 
 - Works in simulation mode out of the box (no model files needed)
